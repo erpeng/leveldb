@@ -156,6 +156,7 @@ class DBImpl : public DB {
   }
 
   // Constant after construction
+  // Env是底层文件相关操作函数的接口
   Env* const env_;
   const InternalKeyComparator internal_comparator_;
   const InternalFilterPolicy internal_filter_policy_;

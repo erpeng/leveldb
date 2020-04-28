@@ -11,7 +11,7 @@
 //
 // Version,VersionSet are thread-compatible, but require external
 // synchronization on all accesses.
-
+// 通过旧的version实现当前存在的iterator的一致性视图,即快照
 #ifndef STORAGE_LEVELDB_DB_VERSION_SET_H_
 #define STORAGE_LEVELDB_DB_VERSION_SET_H_
 
@@ -42,6 +42,10 @@ class WritableFile;
 // Return the smallest index i such that files[i]->largest >= key.
 // Return files.size() if there is no such file.
 // REQUIRES: "files" contains a sorted list of non-overlapping files.
+
+// files中包括一系列不重叠的有序文件.即从level1-level6,返回最小的index i,files[i]
+// 中的最大值需要大于key
+// 如果没有满足条件的文件返回所有文件的个数
 int FindFile(const InternalKeyComparator& icmp,
              const std::vector<FileMetaData*>& files, const Slice& key);
 
@@ -51,6 +55,7 @@ int FindFile(const InternalKeyComparator& icmp,
 // largest==nullptr represents a key largest than all keys in the DB.
 // REQUIRES: If disjoint_sorted_files, files[] contains disjoint ranges
 //           in sorted order.
+// 返回files中是否和[*smallest,*largest]该范围重合
 bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
                            bool disjoint_sorted_files,
                            const std::vector<FileMetaData*>& files,

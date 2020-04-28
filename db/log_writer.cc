@@ -46,6 +46,7 @@ Status Writer::AddRecord(const Slice& slice) {
     if (leftover < kHeaderSize) {
       // Switch to a new block
       if (leftover > 0) {
+        //少于7个字节但大于0,则以\x00补充
         // Fill the trailer (literal below relies on kHeaderSize being 7)
         static_assert(kHeaderSize == 7, "");
         dest_->Append(Slice("\x00\x00\x00\x00\x00\x00", leftover));
@@ -61,6 +62,13 @@ Status Writer::AddRecord(const Slice& slice) {
 
     RecordType type;
     const bool end = (left == fragment_length);
+    // 当整条放入记录时,第一次写,begin为true,之后为false
+    // 如果当前block能完整写入,则end为true,否则为false
+    // 整条日志放到一个block,则为kFullType
+    // begin为true,但不能完整写入当前block,为kFirstType
+    // begin为false,但end为true,写入kLastType
+    // begin,end都为false,则为kMiddleType
+
     if (begin && end) {
       type = kFullType;
     } else if (begin) {
@@ -85,6 +93,7 @@ Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr,
   assert(block_offset_ + kHeaderSize + length <= kBlockSize);
 
   // Format the header
+  // 每条记录由header开始,4字节crc,2字节长度,1字节type
   char buf[kHeaderSize];
   buf[4] = static_cast<char>(length & 0xff);
   buf[5] = static_cast<char>(length >> 8);

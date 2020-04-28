@@ -13,6 +13,8 @@
 //    len: varint32
 //    data: uint8[len]
 
+// WriteBatch的结构 8 sequence|4 count| record 
+
 #include "leveldb/write_batch.h"
 
 #include "db/dbformat.h"

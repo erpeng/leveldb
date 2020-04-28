@@ -182,10 +182,12 @@ DBImpl::~DBImpl() {
 Status DBImpl::NewDB() {
   VersionEdit new_db;
   new_db.SetComparatorName(user_comparator()->Name());
+  //起始的log number 为0
   new_db.SetLogNumber(0);
+  // next file 为2？为什么不是1,因为1是manifest?
   new_db.SetNextFile(2);
   new_db.SetLastSequence(0);
-
+  // manifest从1开始
   const std::string manifest = DescriptorFileName(dbname_, 1);
   WritableFile* file;
   Status s = env_->NewWritableFile(manifest, &file);
@@ -196,6 +198,7 @@ Status DBImpl::NewDB() {
     log::Writer log(file);
     std::string record;
     new_db.EncodeTo(&record);
+    //将一个VersionEdit写入manifest
     s = log.AddRecord(record);
     if (s.ok()) {
       s = file->Close();

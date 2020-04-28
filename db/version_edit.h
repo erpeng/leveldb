@@ -83,6 +83,7 @@ class VersionEdit {
  private:
   friend class VersionSet;
 
+  //int代表level
   typedef std::set<std::pair<int, uint64_t>> DeletedFileSet;
 
   std::string comparator_;
@@ -96,8 +97,11 @@ class VersionEdit {
   bool has_next_file_number_;
   bool has_last_sequence_;
 
+  // int也是level
   std::vector<std::pair<int, InternalKey>> compact_pointers_;
   DeletedFileSet deleted_files_;
+
+  //int代表level
   std::vector<std::pair<int, FileMetaData>> new_files_;
 };
 

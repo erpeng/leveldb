@@ -758,6 +758,7 @@ VersionSet::~VersionSet() {
   delete descriptor_file_;
 }
 
+//将一个Version加入VersionSet,VersionSet的current_指向v,
 void VersionSet::AppendVersion(Version* v) {
   // Make "v" current
   assert(v->refs_ == 0);
@@ -879,6 +880,7 @@ Status VersionSet::Recover(bool* save_manifest) {
   }
   current.resize(current.size() - 1);
 
+  //读取manifest的数据
   std::string dscname = dbname_ + "/" + current;
   SequentialFile* file;
   s = env_->NewSequentialFile(dscname, &file);
