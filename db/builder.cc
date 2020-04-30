@@ -13,13 +13,13 @@
 #include "leveldb/iterator.h"
 
 namespace leveldb {
-
+//生成一个新的ldb文件
 Status BuildTable(const std::string& dbname, Env* env, const Options& options,
                   TableCache* table_cache, Iterator* iter, FileMetaData* meta) {
   Status s;
   meta->file_size = 0;
   iter->SeekToFirst();
-
+  //ldb文件名称
   std::string fname = TableFileName(dbname, meta->number);
   if (iter->Valid()) {
     WritableFile* file;

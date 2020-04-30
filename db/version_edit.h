@@ -67,6 +67,7 @@ class VersionEdit {
     f.file_size = file_size;
     f.smallest = smallest;
     f.largest = largest;
+    //将新文件的信息放入new_files_中
     new_files_.push_back(std::make_pair(level, f));
   }
 

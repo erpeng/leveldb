@@ -506,12 +506,15 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   mutex_.AssertHeld();
   const uint64_t start_micros = env_->NowMicros();
   FileMetaData meta;
+  //首先生成一个文件号码
   meta.number = versions_->NewFileNumber();
+  //将文件号码写入pending_outputs_,该集合内的数据不删除
   pending_outputs_.insert(meta.number);
   Iterator* iter = mem->NewIterator();
   Log(options_.info_log, "Level-0 table #%llu: started",
       (unsigned long long)meta.number);
 
+  //生成一个新的ldb文件
   Status s;
   {
     mutex_.Unlock();
@@ -527,6 +530,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
 
   // Note that if file_size is zero, the file has been deleted and
   // should not be added to the manifest.
+  //更新VersionEdit
   int level = 0;
   if (s.ok() && meta.file_size > 0) {
     const Slice min_user_key = meta.smallest.user_key();
@@ -537,7 +541,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
     edit->AddFile(level, meta.number, meta.file_size, meta.smallest,
                   meta.largest);
   }
-
+  //记录统计数据
   CompactionStats stats;
   stats.micros = env_->NowMicros() - start_micros;
   stats.bytes_written = meta.file_size;
@@ -562,8 +566,11 @@ void DBImpl::CompactMemTable() {
 
   // Replace immutable memtable with the generated Table
   if (s.ok()) {
+    //edit设置prev log number?作用?
     edit.SetPrevLogNumber(0);
+    //edit设置logfile_number_?作用?
     edit.SetLogNumber(logfile_number_);  // Earlier logs no longer needed
+    //记录该次更新
     s = versions_->LogAndApply(&edit, &mutex_);
   }
 
@@ -670,6 +677,7 @@ void DBImpl::MaybeScheduleCompaction() {
              !versions_->NeedsCompaction()) {
     // No work to be done
   } else {
+    //设置标识并开始调度compaction
     background_compaction_scheduled_ = true;
     env_->Schedule(&DBImpl::BGWork, this);
   }
@@ -701,6 +709,7 @@ void DBImpl::BackgroundCall() {
 void DBImpl::BackgroundCompaction() {
   mutex_.AssertHeld();
 
+  //如果存在immutable memtable,则compact mem table
   if (imm_ != nullptr) {
     CompactMemTable();
     return;

@@ -202,7 +202,7 @@ class DBImpl : public DB {
 
   // Have we encountered a background error in paranoid mode?
   Status bg_error_ GUARDED_BY(mutex_);
-
+  //记录每个level进行compact的时间和大小
   CompactionStats stats_[config::kNumLevels] GUARDED_BY(mutex_);
 };
 

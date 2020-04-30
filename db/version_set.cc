@@ -119,6 +119,7 @@ static bool BeforeFile(const Comparator* ucmp, const Slice* user_key,
           ucmp->Compare(*user_key, f->smallest.user_key()) < 0);
 }
 
+//disjoint_sorted_files:当level 为0 时,该值为false,否则为true
 bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
                            bool disjoint_sorted_files,
                            const std::vector<FileMetaData*>& files,
@@ -468,9 +469,11 @@ bool Version::OverlapInLevel(int level, const Slice* smallest_user_key,
                                smallest_user_key, largest_user_key);
 }
 
+//选择compact一个memtable时的压入层级,可以为0,1,2
 int Version::PickLevelForMemTableOutput(const Slice& smallest_user_key,
                                         const Slice& largest_user_key) {
   int level = 0;
+  //如果和level0有重叠,直接返回0
   if (!OverlapInLevel(0, &smallest_user_key, &largest_user_key)) {
     // Push to next level if there is no overlap in next level,
     // and the #bytes overlapping in the level after that are limited.
@@ -643,6 +646,7 @@ class VersionSet::Builder {
     }
 
     // Add new files
+    //将需要加入的文件写入levels_中
     for (size_t i = 0; i < edit->new_files_.size(); i++) {
       const int level = edit->new_files_[i].first;
       FileMetaData* f = new FileMetaData(edit->new_files_[i].second);
@@ -661,6 +665,7 @@ class VersionSet::Builder {
       // same as the compaction of 40KB of data.  We are a little
       // conservative and allow approximately one seek for every 16KB
       // of data before triggering a compaction.
+      //计算一个文件允许的最大的寻找次数,根据该次数可以决定什么时候进行compaction
       f->allowed_seeks = static_cast<int>((f->file_size / 16384U));
       if (f->allowed_seeks < 100) f->allowed_seeks = 100;
 
@@ -787,7 +792,7 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   if (!edit->has_prev_log_number_) {
     edit->SetPrevLogNumber(prev_log_number_);
   }
-
+  //记录该次之后的file number
   edit->SetNextFile(next_file_number_);
   edit->SetLastSequence(last_sequence_);
 
@@ -821,6 +826,7 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
     mu->Unlock();
 
     // Write new record to MANIFEST log
+    // description文件中写入该VersionEdit
     if (s.ok()) {
       std::string record;
       edit->EncodeTo(&record);
