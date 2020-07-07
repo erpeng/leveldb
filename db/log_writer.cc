@@ -43,6 +43,8 @@ Status Writer::AddRecord(const Slice& slice) {
   do {
     const int leftover = kBlockSize - block_offset_;
     assert(leftover >= 0);
+    //如果结尾小于7个字符并且leftover不等于0,需要补\x00
+    //如果leftover等于0则说明正好写满了一个block,将block_offset_置为0即可,不需要padding
     if (leftover < kHeaderSize) {
       // Switch to a new block
       if (leftover > 0) {
@@ -79,6 +81,10 @@ Status Writer::AddRecord(const Slice& slice) {
   return s;
 }
 
+/*
+**RECORD: 
+**Header(7):crc(4)|length(2)|type(1)
+*/
 Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr,
                                   size_t length) {
   assert(length <= 0xffff);  // Must fit in two bytes

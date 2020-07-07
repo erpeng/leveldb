@@ -22,6 +22,10 @@ enum RecordType {
   kMiddleType = 3,
   kLastType = 4
 };
+/*
+** kMaxRecordType RecordType的最大值
+** kZeroType RecordType的最小值
+*/
 static const int kMaxRecordType = kLastType;
 
 static const int kBlockSize = 32768;
