@@ -44,8 +44,10 @@ Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
   char buf[sizeof(file_number)];
   EncodeFixed64(buf, file_number);
   Slice key(buf, sizeof(buf));
+  //以table的序号为key,做cache
   *handle = cache_->Lookup(key);
   if (*handle == nullptr) {
+    //首先打开ldb结尾的文件如果不存在则打开sst结尾的文件
     std::string fname = TableFileName(dbname_, file_number);
     RandomAccessFile* file = nullptr;
     Table* table = nullptr;
@@ -69,6 +71,7 @@ Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
       TableAndFile* tf = new TableAndFile;
       tf->file = file;
       tf->table = table;
+      //cache的命名规则key为文件序号,value为tf(一个TableAndFile结构)
       *handle = cache_->Insert(key, tf, 1, &DeleteEntry);
     }
   }
@@ -111,6 +114,7 @@ Status TableCache::Get(const ReadOptions& options, uint64_t file_number,
   return s;
 }
 
+//逐出这个entry
 void TableCache::Evict(uint64_t file_number) {
   char buf[sizeof(file_number)];
   EncodeFixed64(buf, file_number);

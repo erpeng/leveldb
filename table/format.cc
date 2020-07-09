@@ -11,7 +11,7 @@
 #include "util/crc32c.h"
 
 namespace leveldb {
-
+//将offset_,size_依次以变长放入dst
 void BlockHandle::EncodeTo(std::string* dst) const {
   // Sanity check that all fields have been set
   assert(offset_ != ~static_cast<uint64_t>(0));
@@ -19,7 +19,7 @@ void BlockHandle::EncodeTo(std::string* dst) const {
   PutVarint64(dst, offset_);
   PutVarint64(dst, size_);
 }
-
+//从input中依次取出offset_和size_
 Status BlockHandle::DecodeFrom(Slice* input) {
   if (GetVarint64(input, &offset_) && GetVarint64(input, &size_)) {
     return Status::OK();
@@ -28,11 +28,15 @@ Status BlockHandle::DecodeFrom(Slice* input) {
   }
 }
 
+// metaindex offset_|metaindex size_ |index offset_ |index size_|padding |magic number(8)
 void Footer::EncodeTo(std::string* dst) const {
   const size_t original_size = dst->size();
+  //将metaindex和index的offset和size依次放入dst
   metaindex_handle_.EncodeTo(dst);
   index_handle_.EncodeTo(dst);
+  //resize成40个字节
   dst->resize(2 * BlockHandle::kMaxEncodedLength);  // Padding
+  //放入magic number.8字节
   PutFixed32(dst, static_cast<uint32_t>(kTableMagicNumber & 0xffffffffu));
   PutFixed32(dst, static_cast<uint32_t>(kTableMagicNumber >> 32));
   assert(dst->size() == original_size + kEncodedLength);
@@ -45,6 +49,7 @@ Status Footer::DecodeFrom(Slice* input) {
   const uint32_t magic_hi = DecodeFixed32(magic_ptr + 4);
   const uint64_t magic = ((static_cast<uint64_t>(magic_hi) << 32) |
                           (static_cast<uint64_t>(magic_lo)));
+  // 校验magic number
   if (magic != kTableMagicNumber) {
     return Status::Corruption("not an sstable (bad magic number)");
   }
@@ -72,6 +77,7 @@ Status ReadBlock(RandomAccessFile* file, const ReadOptions& options,
   size_t n = static_cast<size_t>(handle.size());
   char* buf = new char[n + kBlockTrailerSize];
   Slice contents;
+  //从文件中取出一个block,每个block后续有1字节的type,4字节的crc
   Status s = file->Read(handle.offset(), n + kBlockTrailerSize, &contents, buf);
   if (!s.ok()) {
     delete[] buf;
@@ -85,8 +91,8 @@ Status ReadBlock(RandomAccessFile* file, const ReadOptions& options,
   // Check the crc of the type and the block contents
   const char* data = contents.data();  // Pointer to where Read put the data
   if (options.verify_checksums) {
-    const uint32_t crc = crc32c::Unmask(DecodeFixed32(data + n + 1));
-    const uint32_t actual = crc32c::Value(data, n + 1);
+    const uint32_t crc = crc32c::Unmask(DecodeFixed32(data + n + 1));//取出crc
+    const uint32_t actual = crc32c::Value(data, n + 1);//计算crc,包括数据和type
     if (actual != crc) {
       delete[] buf;
       s = Status::Corruption("block checksum mismatch");
@@ -95,7 +101,9 @@ Status ReadBlock(RandomAccessFile* file, const ReadOptions& options,
   }
 
   switch (data[n]) {
+    //type为无压缩类型
     case kNoCompression:
+      //data和buf同与不同的区别？
       if (data != buf) {
         // File implementation gave us pointer to some other data.
         // Use it directly under the assumption that it will be live
@@ -112,6 +120,8 @@ Status ReadBlock(RandomAccessFile* file, const ReadOptions& options,
 
       // Ok
       break;
+    //Snappy压缩类型
+    //解压后返回
     case kSnappyCompression: {
       size_t ulength = 0;
       if (!port::Snappy_GetUncompressedLength(data, n, &ulength)) {

@@ -43,8 +43,8 @@ namespace {
 struct LRUHandle {
   void* value;
   void (*deleter)(const Slice&, void* value);
-  LRUHandle* next_hash;
-  LRUHandle* next;
+  LRUHandle* next_hash; //如果hash和key相同,则以一个链表串起来
+  LRUHandle* next; //lru节点的next和prev
   LRUHandle* prev;
   size_t charge;  // TODO(opt): Only allow uint32_t?
   size_t key_length;
@@ -92,6 +92,7 @@ class HandleTable {
     return old;
   }
 
+ // 二级指针直接插入和删除,不会有内存泄漏吗？
   LRUHandle* Remove(const Slice& key, uint32_t hash) {
     LRUHandle** ptr = FindPointer(key, hash);
     LRUHandle* result = *ptr;
@@ -105,8 +106,8 @@ class HandleTable {
  private:
   // The table consists of an array of buckets where each bucket is
   // a linked list of cache entries that hash into the bucket.
-  uint32_t length_;
-  uint32_t elems_;
+  uint32_t length_;//bucket个数
+  uint32_t elems_;//元素个数
   LRUHandle** list_;
 
   // Return a pointer to slot that points to a cache entry that
@@ -128,13 +129,16 @@ class HandleTable {
     LRUHandle** new_list = new LRUHandle*[new_length];
     memset(new_list, 0, sizeof(new_list[0]) * new_length);
     uint32_t count = 0;
+    //将旧hash表上的数据移到新的hash表上
     for (uint32_t i = 0; i < length_; i++) {
       LRUHandle* h = list_[i];
       while (h != nullptr) {
         LRUHandle* next = h->next_hash;
         uint32_t hash = h->hash;
         LRUHandle** ptr = &new_list[hash & (new_length - 1)];
+        //从头部插入,将原来的元素放到h的下一个元素
         h->next_hash = *ptr;
+        //然后将当前为之的值置为h
         *ptr = h;
         h = next;
         count++;
@@ -215,6 +219,7 @@ LRUCache::~LRUCache() {
   }
 }
 
+//Ref会将lru_中的entry放置到in_use_中
 void LRUCache::Ref(LRUHandle* e) {
   if (e->refs == 1 && e->in_cache) {  // If on lru_ list, move to in_use_ list.
     LRU_Remove(e);
@@ -222,7 +227,7 @@ void LRUCache::Ref(LRUHandle* e) {
   }
   e->refs++;
 }
-
+//Unref会将in_use_中的放置到lru_中
 void LRUCache::Unref(LRUHandle* e) {
   assert(e->refs > 0);
   e->refs--;
@@ -237,11 +242,13 @@ void LRUCache::Unref(LRUHandle* e) {
   }
 }
 
+//双向链表删除一个节点e
 void LRUCache::LRU_Remove(LRUHandle* e) {
   e->next->prev = e->prev;
   e->prev->next = e->next;
 }
 
+//将e插入list的前边
 void LRUCache::LRU_Append(LRUHandle* list, LRUHandle* e) {
   // Make "e" newest entry by inserting just before *list
   e->next = list;
@@ -271,7 +278,7 @@ Cache::Handle* LRUCache::Insert(const Slice& key, uint32_t hash, void* value,
   MutexLock l(&mutex_);
 
   LRUHandle* e =
-      reinterpret_cast<LRUHandle*>(malloc(sizeof(LRUHandle) - 1 + key.size()));
+      reinterpret_cast<LRUHandle*>(malloc(sizeof(LRUHandle) - 1 + key.size()));//LRUHANDLE中key_data有一位的占位
   e->value = value;
   e->deleter = deleter;
   e->charge = charge;
@@ -286,11 +293,13 @@ Cache::Handle* LRUCache::Insert(const Slice& key, uint32_t hash, void* value,
     e->in_cache = true;
     LRU_Append(&in_use_, e);
     usage_ += charge;
+    //此处会将返回的e处理,从链表中移除,并且判断是否要删除
     FinishErase(table_.Insert(e));
   } else {  // don't cache. (capacity_==0 is supported and turns off caching.)
     // next is read by key() in an assert, so it must be initialized
     e->next = nullptr;
   }
+  //逐出策略,从lru_链表中清除,lru_.next是最旧的一个entry
   while (usage_ > capacity_ && lru_.next != &lru_) {
     LRUHandle* old = lru_.next;
     assert(old->refs == 1);
@@ -350,6 +359,7 @@ class ShardedLRUCache : public Cache {
 
  public:
   explicit ShardedLRUCache(size_t capacity) : last_id_(0) {
+    //每个shards保存多少entry,向上取整
     const size_t per_shard = (capacity + (kNumShards - 1)) / kNumShards;
     for (int s = 0; s < kNumShards; s++) {
       shard_[s].SetCapacity(per_shard);
