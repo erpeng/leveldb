@@ -116,7 +116,7 @@ bool InternalFilterPolicy::KeyMayMatch(const Slice& key, const Slice& f) const {
 
 LookupKey::LookupKey(const Slice& user_key, SequenceNumber s) {
   size_t usize = user_key.size();
-  size_t needed = usize + 13;  // A conservative estimate
+  size_t needed = usize + 13;  // A conservative estimate // 13 = 8 + 5 8个字节的seq<<8|type,5个字节的userkey长度 
   char* dst;
   if (needed <= sizeof(space_)) {
     dst = space_;

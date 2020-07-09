@@ -46,6 +46,12 @@ static const int kReadBytesPeriod = 1048576;
 
 }  // namespace config
 
+
+/*
+** userkey:不包括seq
+** internalkey:包括userkey|(seq<<8|type)-共8个字节 
+** 
+*/
 class InternalKey;
 
 // Value types encoded as the last component of internal keys.
@@ -92,6 +98,7 @@ void AppendInternalKey(std::string* result, const ParsedInternalKey& key);
 bool ParseInternalKey(const Slice& internal_key, ParsedInternalKey* result);
 
 // Returns the user key portion of an internal key.
+// 返回一个user_key,不包括seq
 inline Slice ExtractUserKey(const Slice& internal_key) {
   assert(internal_key.size() >= 8);
   return Slice(internal_key.data(), internal_key.size() - 8);
@@ -192,10 +199,10 @@ class LookupKey {
 
   ~LookupKey();
 
-  // Return a key suitable for lookup in a MemTable.
+  // Return a key suitable for lookup in a MemTable. userkeylen|userkey|seq|type
   Slice memtable_key() const { return Slice(start_, end_ - start_); }
 
-  // Return an internal key (suitable for passing to an internal iterator)
+  // Return an internal key (suitable for passing to an internal iterator) userkey|seq|type
   Slice internal_key() const { return Slice(kstart_, end_ - kstart_); }
 
   // Return the user key

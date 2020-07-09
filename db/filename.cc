@@ -68,8 +68,9 @@ std::string OldInfoLogFileName(const std::string& dbname) {
   return dbname + "/LOG.old";
 }
 
+// 每个文件的作用 sst和ldb都是表文件
 // Owned filenames have the form:
-//    dbname/CURRENT
+//    dbname/CURRENT // 保存当前的MANIFESET文件名称
 //    dbname/LOCK
 //    dbname/LOG
 //    dbname/LOG.old
@@ -120,6 +121,7 @@ bool ParseFileName(const std::string& filename, uint64_t* number,
   return true;
 }
 
+//将descriptor_number指定的manifest写入CURRENT文件
 Status SetCurrentFile(Env* env, const std::string& dbname,
                       uint64_t descriptor_number) {
   // Remove leading "dbname/" and add newline to manifest file name
