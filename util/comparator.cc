@@ -27,7 +27,7 @@ class BytewiseComparatorImpl : public Comparator {
   int Compare(const Slice& a, const Slice& b) const override {
     return a.compare(b);
   }
-
+  // start和limit的最短分隔字符串,例如 (abceg,abcq) => abcf
   void FindShortestSeparator(std::string* start,
                              const Slice& limit) const override {
     // Find length of common prefix
@@ -37,7 +37,7 @@ class BytewiseComparatorImpl : public Comparator {
            ((*start)[diff_index] == limit[diff_index])) {
       diff_index++;
     }
-
+    // diff_index是start和limit的最长前缀长度
     if (diff_index >= min_length) {
       // Do not shorten if one string is a prefix of the other
     } else {
@@ -50,7 +50,7 @@ class BytewiseComparatorImpl : public Comparator {
       }
     }
   }
-
+  // key的每一个字符都加1,abc=>b
   void FindShortSuccessor(std::string* key) const override {
     // Find first character that can be incremented
     size_t n = key->size();

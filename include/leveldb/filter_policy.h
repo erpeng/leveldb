@@ -43,6 +43,11 @@ class LEVELDB_EXPORT FilterPolicy {
   virtual void CreateFilter(const Slice* keys, int n,
                             std::string* dst) const = 0;
 
+  /*
+  **  如果key在filter中那么必然返回true.
+  **  如果key不在filter中,那么可以返回true或者false,但大概率返回false
+  **  也就是说如果返回false,肯定不存在该key,如果返回true,则有可能在也可能不在,但存在的概率更大
+  */
   // "filter" contains the data appended by a preceding call to
   // CreateFilter() on this class.  This method must return true if
   // the key was in the list of keys passed to CreateFilter().

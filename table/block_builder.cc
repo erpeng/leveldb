@@ -69,14 +69,17 @@ Slice BlockBuilder::Finish() {
 }
 
 void BlockBuilder::Add(const Slice& key, const Slice& value) {
+  //last_key_是前一次调用Add时增加的key
   Slice last_key_piece(last_key_);
   assert(!finished_);
   assert(counter_ <= options_->block_restart_interval);
   assert(buffer_.empty()  // No values yet?
          || options_->comparator->Compare(key, last_key_piece) > 0);
   size_t shared = 0;
+  //counter_是本次重启点已经放置了多少的key
   if (counter_ < options_->block_restart_interval) {
     // See how much sharing to do with previous string
+    //取出本次的key和上一个key相比有多少可以共享的字节
     const size_t min_length = std::min(last_key_piece.size(), key.size());
     while ((shared < min_length) && (last_key_piece[shared] == key[shared])) {
       shared++;
@@ -98,6 +101,7 @@ void BlockBuilder::Add(const Slice& key, const Slice& value) {
   buffer_.append(value.data(), value.size());
 
   // Update state
+  // 此处为何不直接赋值为key的值?这样写更有效率？
   last_key_.resize(shared);
   last_key_.append(key.data() + shared, non_shared);
   assert(Slice(last_key_) == key);

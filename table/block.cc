@@ -17,6 +17,7 @@
 
 namespace leveldb {
 
+//block的最后4个字节是重启点的个数
 inline uint32_t Block::NumRestarts() const {
   assert(size_ >= sizeof(uint32_t));
   return DecodeFixed32(data_ + size_ - sizeof(uint32_t));
@@ -29,11 +30,14 @@ Block::Block(const BlockContents& contents)
   if (size_ < sizeof(uint32_t)) {
     size_ = 0;  // Error marker
   } else {
+    //restart 1(4)|restart 2(4)|......|restart count.每个重启点的偏移占4个字节
     size_t max_restarts_allowed = (size_ - sizeof(uint32_t)) / sizeof(uint32_t);
+    //计算最大允许的重启点个数,如果当前重启点大于允许的最大个数,说明有问题
     if (NumRestarts() > max_restarts_allowed) {
       // The size is too small for NumRestarts()
       size_ = 0;
     } else {
+      //restart_offset_为重启点的偏移,即从restart_offset_开始是重启点的数据
       restart_offset_ = size_ - (1 + NumRestarts()) * sizeof(uint32_t);
     }
   }
@@ -52,6 +56,7 @@ Block::~Block() {
 //
 // If any errors are detected, returns nullptr.  Otherwise, returns a
 // pointer to the key delta (just past the three decoded values).
+// 从一个entry中将shared|non_shared|value_length分别decode出来
 static inline const char* DecodeEntry(const char* p, const char* limit,
                                       uint32_t* shared, uint32_t* non_shared,
                                       uint32_t* value_length) {
@@ -97,6 +102,7 @@ class Block::Iter : public Iterator {
     return (value_.data() + value_.size()) - data_;
   }
 
+  //获取block中重启点的偏移量
   uint32_t GetRestartPoint(uint32_t index) {
     assert(index < num_restarts_);
     return DecodeFixed32(data_ + restarts_ + index * sizeof(uint32_t));
@@ -161,6 +167,7 @@ class Block::Iter : public Iterator {
     } while (ParseNextKey() && NextEntryOffset() < original);
   }
 
+  //通过restart array二分查找一个重启点,使得key < target
   void Seek(const Slice& target) override {
     // Binary search in restart array to find the last restart point
     // with a key < target
@@ -222,6 +229,11 @@ class Block::Iter : public Iterator {
     value_.clear();
   }
 
+  /*
+  **解析下一个key,将key/value放入key_和value_变量中
+  **current_是当前偏移量
+  **restart_index_是当前使用到的重启点索引
+  */
   bool ParseNextKey() {
     current_ = NextEntryOffset();
     const char* p = data_ + current_;

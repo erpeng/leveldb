@@ -35,6 +35,7 @@ struct Table::Rep {
   Block* index_block;
 };
 
+
 Status Table::Open(const Options& options, RandomAccessFile* file,
                    uint64_t size, Table** table) {
   *table = nullptr;
@@ -48,6 +49,7 @@ Status Table::Open(const Options& options, RandomAccessFile* file,
                         &footer_input, footer_space);
   if (!s.ok()) return s;
 
+  //取出footer,footer中包含metaindex block与index block
   Footer footer;
   s = footer.DecodeFrom(&footer_input);
   if (!s.ok()) return s;
@@ -79,6 +81,7 @@ Status Table::Open(const Options& options, RandomAccessFile* file,
   return s;
 }
 
+//meta中放置了filter,读出filter,然后在rep_中构造filter
 void Table::ReadMeta(const Footer& footer) {
   if (rep_->options.filter_policy == nullptr) {
     return;  // Do not need any metadata
