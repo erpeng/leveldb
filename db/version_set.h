@@ -173,6 +173,7 @@ class VersionSet {
 
   ~VersionSet();
 
+  // 将当前的version和edit合并成为一个新的version
   // Apply *edit to the current version to form a new descriptor that
   // is both saved to persistent state and installed as the new
   // current version.  Will release *mu while actually writing to the file.
@@ -337,10 +338,12 @@ class Compaction {
   // Maximum size of files to build during this compaction.
   uint64_t MaxOutputFileSize() const { return max_output_file_size_; }
 
+  // trivial move 表示将level_层的一个文件放到level_+1层,没有合并和分割
   // Is this a trivial compaction that can be implemented by just
   // moving a single input file to the next level (no merging or splitting)
   bool IsTrivialMove() const;
 
+  // 将所有inputs_的文件放置到edit的delete files中
   // Add all inputs to this compaction as delete operations to *edit.
   void AddInputDeletions(VersionEdit* edit);
 
@@ -368,9 +371,11 @@ class Compaction {
   Version* input_version_;
   VersionEdit edit_;
 
+  // 要合并的文件,inputs_[0]和inputs_[1]分别代表level_和level_+1层的文件
   // Each compaction reads inputs from "level_" and "level_+1"
   std::vector<FileMetaData*> inputs_[2];  // The two sets of inputs
 
+  // grandparents_表示的是level_ + 2层的文件
   // State used to check for number of overlapping grandparent files
   // (parent == level_ + 1, grandparent == level_ + 2)
   std::vector<FileMetaData*> grandparents_;

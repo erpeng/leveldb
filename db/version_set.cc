@@ -38,6 +38,8 @@ static int64_t ExpandedCompactionByteSizeLimit(const Options* options) {
   return 25 * TargetFileSize(options);
 }
 
+// level 0和1 10M.但level 0 实际是按照文件个数去触发compaction
+// 每一个层级最大是10倍
 static double MaxBytesForLevel(const Options* options, int level) {
   // Note: the result for level zero is not really used since we set
   // the level-0 compaction threshold based on number of files.
@@ -51,11 +53,13 @@ static double MaxBytesForLevel(const Options* options, int level) {
   return result;
 }
 
+// 每个文件的最大值
 static uint64_t MaxFileSizeForLevel(const Options* options, int level) {
   // We could vary per level to reduce number of files?
   return TargetFileSize(options);
 }
 
+// 计算files中的文件总大小
 static int64_t TotalFileSize(const std::vector<FileMetaData*>& files) {
   int64_t sum = 0;
   for (size_t i = 0; i < files.size(); i++) {
@@ -83,6 +87,8 @@ Version::~Version() {
     }
   }
 }
+
+// 找出最小的index i,使得files[i]->largest >= key.
 
 int FindFile(const InternalKeyComparator& icmp,
              const std::vector<FileMetaData*>& files, const Slice& key) {
@@ -118,6 +124,10 @@ static bool BeforeFile(const Comparator* ucmp, const Slice* user_key,
           ucmp->Compare(*user_key, f->smallest.user_key()) < 0);
 }
 
+/* 
+** disjoint_sorted_files:true 有重叠,level 0,需要校验所有文件
+** disjoint_sorted_files:false 无重叠,level 1-7,二分查找
+*/
 bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
                            bool disjoint_sorted_files,
                            const std::vector<FileMetaData*>& files,
@@ -155,6 +165,7 @@ bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
   return !BeforeFile(ucmp, largest_user_key, files[index]);
 }
 
+// key()返回文件中最大的key,value()返回16字节的文件 number 和 文件的size
 // An internal iterator.  For a given version/level pair, yields
 // information about the files in the level.  For a given entry, key()
 // is the largest key that occurs in the file, and value() is an

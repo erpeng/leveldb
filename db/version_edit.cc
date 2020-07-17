@@ -83,6 +83,7 @@ void VersionEdit::EncodeTo(std::string* dst) const {
   }
 }
 
+// 从一个slice中获取一个internal key: compact_pointers_/new_files_中都有将internal key存储为slice的情况
 static bool GetInternalKey(Slice* input, InternalKey* dst) {
   Slice str;
   if (GetLengthPrefixedSlice(input, &str)) {
@@ -92,6 +93,7 @@ static bool GetInternalKey(Slice* input, InternalKey* dst) {
   }
 }
 
+// 从一个slice中获取一个level数值: compact_pointers_/new_files_/deleted_files_都有level字段
 static bool GetLevel(Slice* input, int* level) {
   uint32_t v;
   if (GetVarint32(input, &v) && v < config::kNumLevels) {

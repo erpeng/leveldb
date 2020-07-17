@@ -87,7 +87,7 @@ class VersionEdit {
 
   std::string comparator_;
   uint64_t log_number_;
-  uint64_t prev_log_number_;
+  uint64_t prev_log_number_; // prev_log_number_与log_number_的关系,log_number-1?
   uint64_t next_file_number_;
   SequenceNumber last_sequence_;
   bool has_comparator_;
