@@ -90,7 +90,7 @@ class Block::Iter : public Iterator {
   uint32_t current_;
   uint32_t restart_index_;  // Index of restart block in which current_ falls
   std::string key_;
-  Slice value_;
+  Slice value_; 
   Status status_;
 
   inline int Compare(const Slice& a, const Slice& b) const {
@@ -179,7 +179,7 @@ class Block::Iter : public Iterator {
       uint32_t shared, non_shared, value_length;
       const char* key_ptr =
           DecodeEntry(data_ + region_offset, data_ + restarts_, &shared,
-                      &non_shared, &value_length);
+                      &non_shared, &value_length);//重启点开始位置的shared肯定是0
       if (key_ptr == nullptr || (shared != 0)) {
         CorruptionError();
         return;

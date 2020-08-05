@@ -79,6 +79,7 @@ class HandleTable {
   LRUHandle* Insert(LRUHandle* h) {
     LRUHandle** ptr = FindPointer(h->key(), h->hash);
     LRUHandle* old = *ptr;
+    //old为nullprt说明不存在h的值,否则说明已经存在,需要覆盖掉
     h->next_hash = (old == nullptr ? nullptr : old->next_hash);
     *ptr = h;
     if (old == nullptr) {
@@ -138,7 +139,7 @@ class HandleTable {
         LRUHandle** ptr = &new_list[hash & (new_length - 1)];
         //从头部插入,将原来的元素放到h的下一个元素
         h->next_hash = *ptr;
-        //然后将当前为之的值置为h
+        //然后将当前位置的值置为h
         *ptr = h;
         h = next;
         count++;

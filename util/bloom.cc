@@ -61,6 +61,9 @@ class BloomFilterPolicy : public FilterPolicy {
 
   bool KeyMayMatch(const Slice& key, const Slice& bloom_filter) const override {
     const size_t len = bloom_filter.size();
+    /* 
+    ** 至少有一个k_
+    */
     if (len < 2) return false;
 
     const char* array = bloom_filter.data();
