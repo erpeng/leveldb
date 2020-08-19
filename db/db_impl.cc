@@ -219,6 +219,11 @@ void DBImpl::MaybeIgnoreError(Status* s) const {
   }
 }
 
+/* 
+** 1.取出所有正在compation和VersionSet中的文件
+** 2.取出所有目录中的文件
+** 3.判断是否可以删除
+*/
 void DBImpl::RemoveObsoleteFiles() {
   mutex_.AssertHeld();
 
@@ -229,6 +234,7 @@ void DBImpl::RemoveObsoleteFiles() {
   }
 
   // Make a set of all of the live files
+  // 将所有正在compation的文件,所有VersionSet的文件都放到live中
   std::set<uint64_t> live = pending_outputs_;
   versions_->AddLiveFiles(&live);
 
@@ -242,6 +248,7 @@ void DBImpl::RemoveObsoleteFiles() {
       bool keep = true;
       switch (type) {
         case kLogFile:
+          // 可以删除小于VersionSet中的log_number_并且不等于prev_log_number_的日志文件
           keep = ((number >= versions_->LogNumber()) ||
                   (number == versions_->PrevLogNumber()));
           break;

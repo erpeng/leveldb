@@ -125,8 +125,8 @@ static bool BeforeFile(const Comparator* ucmp, const Slice* user_key,
 }
 
 /* 
-** disjoint_sorted_files:true 有重叠,level 0,需要校验所有文件
-** disjoint_sorted_files:false 无重叠,level 1-7,二分查找
+** disjoint_sorted_files:false 有重叠,level 0,需要校验所有文件
+** disjoint_sorted_files:true 无重叠,level 1-7,二分查找
 */
 bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
                            bool disjoint_sorted_files,
@@ -1034,6 +1034,11 @@ void VersionSet::MarkFileNumberUsed(uint64_t number) {
   }
 }
 
+// 设置version的compatcion_level_和compaction_score_
+/* 
+** level 0:根据文件个数/4,计算score
+** level 1-N:根据该level的文件总大小/该level允许的文件大小计算score
+*/
 void VersionSet::Finalize(Version* v) {
   // Precomputed best level for next compaction
   int best_level = -1;
