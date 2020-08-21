@@ -1253,6 +1253,12 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
     versions_->SetLastSequence(last_sequence);
   }
 
+  
+  /* 
+  ** 由于BuildBatchGroup会将多个writer的写入进行合并,因此会存在ready != last_writer的情况 
+  ** 需要将done置为true
+  ** BuildBatchGroup会将last_writer的指针传入,进行改写
+  */
   while (true) {
     Writer* ready = writers_.front();
     writers_.pop_front();

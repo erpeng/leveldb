@@ -423,6 +423,10 @@ bool Version::UpdateStats(const GetStats& stats) {
   return false;
 }
 
+// 更新一个文件的allow_seeks
+/* 
+** 即一个key在该文件范围之内,并且在一个level+1的文件范围之内,则level层的文件允许的allow_seeks - 1 
+*/
 bool Version::RecordReadSample(Slice internal_key) {
   ParsedInternalKey ikey;
   if (!ParseInternalKey(internal_key, &ikey)) {

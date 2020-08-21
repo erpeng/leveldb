@@ -90,11 +90,13 @@ class Reader {
   bool const checksum_;
   char* const backing_store_;
   Slice buffer_;
+  // eof_标记已经读到了一个record的结尾
   bool eof_;  // Last Read() indicated EOF by returning < kBlockSize
 
   // Offset of the last record returned by ReadRecord.
   uint64_t last_record_offset_;
   // Offset of the first location past the end of buffer_.
+  // buffer_存储一个个record,end_of_buffer_offset_是buffer_大小
   uint64_t end_of_buffer_offset_;
 
   // Offset at which to start looking for the first record to return

@@ -30,11 +30,16 @@ Reader::Reader(SequentialFile* file, Reporter* reporter, bool checksum,
 
 Reader::~Reader() { delete[] backing_store_; }
 
+/* 
+** 根据initial_offset_寻找到一个block的开始位置
+** 每个block的开头都是crc|len|type
+*/
 bool Reader::SkipToInitialBlock() {
   const size_t offset_in_block = initial_offset_ % kBlockSize;
   uint64_t block_start_location = initial_offset_ - offset_in_block;
 
   // Don't search a block if we'd be in the trailer
+  // 如果偏移量已经到了trailer的位置,则从下一个block开始
   if (offset_in_block > kBlockSize - 6) {
     block_start_location += kBlockSize;
   }
@@ -204,6 +209,7 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
         }
         continue;
       } else {
+        // 进入这部分,说明首先buffer_的大小小于7,其次已经从file_中读取过数据到buffer_
         // Note that if buffer_ is non-empty, we have a truncated header at the
         // end of the file, which can be caused by the writer crashing in the
         // middle of writing the header. Instead of considering this an error,
@@ -240,7 +246,7 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
       return kBadRecord;
     }
 
-    // Check crc
+    // Check crc 校验crc.从type开始加值计算crc
     if (checksum_) {
       uint32_t expected_crc = crc32c::Unmask(DecodeFixed32(header));
       uint32_t actual_crc = crc32c::Value(header + 6, 1 + length);
