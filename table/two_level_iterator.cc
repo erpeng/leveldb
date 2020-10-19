@@ -161,7 +161,7 @@ void TwoLevelIterator::InitDataBlock() {
 }
 
 }  // namespace
-
+//两层iterator,第一层读取index的block获取偏移量,第二层通过block获取数据
 Iterator* NewTwoLevelIterator(Iterator* index_iter,
                               BlockFunction block_function, void* arg,
                               const ReadOptions& options) {

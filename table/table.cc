@@ -35,7 +35,7 @@ struct Table::Rep {
   Block* index_block;
 };
 
-
+//读取一个Table.Table中关键数据保存到了Rep结构体中
 Status Table::Open(const Options& options, RandomAccessFile* file,
                    uint64_t size, Table** table) {
   *table = nullptr;
@@ -45,6 +45,7 @@ Status Table::Open(const Options& options, RandomAccessFile* file,
 
   char footer_space[Footer::kEncodedLength];
   Slice footer_input;
+  //首先读取尾部
   Status s = file->Read(size - Footer::kEncodedLength, Footer::kEncodedLength,
                         &footer_input, footer_space);
   if (!s.ok()) return s;
@@ -60,6 +61,7 @@ Status Table::Open(const Options& options, RandomAccessFile* file,
   if (options.paranoid_checks) {
     opt.verify_checksums = true;
   }
+  //将index block读取到index_block_contents中
   s = ReadBlock(file, opt, footer.index_handle(), &index_block_contents);
 
   if (s.ok()) {
@@ -94,6 +96,7 @@ void Table::ReadMeta(const Footer& footer) {
     opt.verify_checksums = true;
   }
   BlockContents contents;
+  //读取metaindex block,将内容放到contents中
   if (!ReadBlock(rep_->file, opt, footer.metaindex_handle(), &contents).ok()) {
     // Do not propagate errors since meta info is not needed for operation
     return;
@@ -101,6 +104,7 @@ void Table::ReadMeta(const Footer& footer) {
   Block* meta = new Block(contents);
 
   Iterator* iter = meta->NewIterator(BytewiseComparator());
+  //根据配置的filter名字将value读取出来
   std::string key = "filter.";
   key.append(rep_->options.filter_policy->Name());
   iter->Seek(key);
@@ -131,6 +135,7 @@ void Table::ReadFilter(const Slice& filter_handle_value) {
   if (block.heap_allocated) {
     rep_->filter_data = block.data.data();  // Will need to delete later
   }
+  // 最终构建rep_中的filter字段,为一个FilterBlockReader
   rep_->filter = new FilterBlockReader(rep_->options.filter_policy, block.data);
 }
 
@@ -187,6 +192,7 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
         }
       }
     } else {
+      //读取一个block
       s = ReadBlock(table->rep_->file, options, handle, &contents);
       if (s.ok()) {
         block = new Block(contents);
@@ -196,6 +202,7 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
 
   Iterator* iter;
   if (block != nullptr) {
+    //生成一个block的iterator,通过该iterator读取数据
     iter = block->NewIterator(table->rep_->options.comparator);
     if (cache_handle == nullptr) {
       iter->RegisterCleanup(&DeleteBlock, block, nullptr);
@@ -208,6 +215,7 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
   return iter;
 }
 
+//通过一个Iterator读取一个Table
 Iterator* Table::NewIterator(const ReadOptions& options) const {
   return NewTwoLevelIterator(
       rep_->index_block->NewIterator(rep_->options.comparator),
@@ -224,10 +232,12 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k, void* arg,
     Slice handle_value = iiter->value();
     FilterBlockReader* filter = rep_->filter;
     BlockHandle handle;
+    //如果有过滤器并且没有匹配上key,说明没有找到相应的key
     if (filter != nullptr && handle.DecodeFrom(&handle_value).ok() &&
         !filter->KeyMayMatch(handle.offset(), k)) {
       // Not found
     } else {
+      //否则通过block iterator去读取一个key
       Iterator* block_iter = BlockReader(this, options, iiter->value());
       block_iter->Seek(k);
       if (block_iter->Valid()) {

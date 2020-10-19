@@ -57,6 +57,7 @@ Block::~Block() {
 // If any errors are detected, returns nullptr.  Otherwise, returns a
 // pointer to the key delta (just past the three decoded values).
 // 从一个entry中将shared|non_shared|value_length分别decode出来
+// 返回值p指向shared|non_shared|value_length之后,及non_shared开始的字符串位置
 static inline const char* DecodeEntry(const char* p, const char* limit,
                                       uint32_t* shared, uint32_t* non_shared,
                                       uint32_t* value_length) {
@@ -82,22 +83,23 @@ static inline const char* DecodeEntry(const char* p, const char* limit,
 class Block::Iter : public Iterator {
  private:
   const Comparator* const comparator_;
-  const char* const data_;       // underlying block contents
-  uint32_t const restarts_;      // Offset of restart array (list of fixed32)
-  uint32_t const num_restarts_;  // Number of uint32_t entries in restart array
+  const char* const data_;       // underlying block contents 块数据
+  uint32_t const restarts_;      // Offset of restart array (list of fixed32) 重启点开始的位置
+  uint32_t const num_restarts_;  // Number of uint32_t entries in restart array 重启点的个数
 
   // current_ is offset in data_ of current entry.  >= restarts_ if !Valid
   uint32_t current_;
   uint32_t restart_index_;  // Index of restart block in which current_ falls
-  std::string key_;
-  Slice value_; 
-  Status status_;
+  std::string key_; //Block中的key数据
+  Slice value_;  //Block中的值数据
+  Status status_; 
 
   inline int Compare(const Slice& a, const Slice& b) const {
     return comparator_->Compare(a, b);
   }
 
   // Return the offset in data_ just past the end of the current entry.
+  // 下一个键值开始的偏移量
   inline uint32_t NextEntryOffset() const {
     return (value_.data() + value_.size()) - data_;
   }
@@ -108,6 +110,7 @@ class Block::Iter : public Iterator {
     return DecodeFixed32(data_ + restarts_ + index * sizeof(uint32_t));
   }
 
+ //调用该函数后将key_清0,value_也清0.restart_index_置为重启点的索引
   void SeekToRestartPoint(uint32_t index) {
     key_.clear();
     restart_index_ = index;
@@ -130,6 +133,7 @@ class Block::Iter : public Iterator {
     assert(num_restarts_ > 0);
   }
 
+   //current_指向当前数据的偏移量,必须小于重启点开始位置才为有效
   bool Valid() const override { return current_ < restarts_; }
   Status status() const override { return status_; }
   Slice key() const override {
@@ -195,7 +199,7 @@ class Block::Iter : public Iterator {
         right = mid - 1;
       }
     }
-
+    // 先找到一个重启点开始的位置,然后线性遍历这个重启点到下一个重启点的数据
     // Linear search (within restart block) for first key >= target
     SeekToRestartPoint(left);
     while (true) {
@@ -252,9 +256,9 @@ class Block::Iter : public Iterator {
       CorruptionError();
       return false;
     } else {
-      key_.resize(shared);
-      key_.append(p, non_shared);
-      value_ = Slice(p + non_shared, value_length);
+      key_.resize(shared); //将key重置为只有共享部分
+      key_.append(p, non_shared);//将非共享部分附加,即得到了一个完整的key
+      value_ = Slice(p + non_shared, value_length);//获取value_的值
       while (restart_index_ + 1 < num_restarts_ &&
              GetRestartPoint(restart_index_ + 1) < current_) {
         ++restart_index_;
