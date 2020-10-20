@@ -156,12 +156,12 @@ bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
                           kValueTypeForSeek);
     index = FindFile(icmp, files, small_key.Encode());
   }
-
+  // FindFile查找到的index,表明了files[index]的最大值大于等于small_key.Encode()
   if (index >= files.size()) {
     // beginning of range is after all files, so no overlap.
     return false;
   }
-
+  // !BeforeFile:表明files[index]的最小值小于largest_user_key
   return !BeforeFile(ucmp, largest_user_key, files[index]);
 }
 
@@ -518,6 +518,8 @@ int Version::PickLevelForMemTableOutput(const Slice& smallest_user_key,
   return level;
 }
 
+// 参考PickLevelForMemTableOutput,因为选取这个范围是为了避免和下一级有太多重叠导致需要compact
+// 所以level0需要扩展范围继续选取
 // Store in "*inputs" all files in "level" that overlap [begin,end]
 void Version::GetOverlappingInputs(int level, const InternalKey* begin,
                                    const InternalKey* end,
