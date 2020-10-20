@@ -40,12 +40,14 @@ TableCache::~TableCache() { delete cache_; }
 
 Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
                              Cache::Handle** handle) {
+
   Status s;
   char buf[sizeof(file_number)];
   EncodeFixed64(buf, file_number);
   Slice key(buf, sizeof(buf));
   //以table的序号为key,做cache
   *handle = cache_->Lookup(key);
+  //如果未找到对应的缓存
   if (*handle == nullptr) {
     //首先打开ldb结尾的文件如果不存在则打开sst结尾的文件
     std::string fname = TableFileName(dbname_, file_number);
@@ -77,7 +79,7 @@ Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
   }
   return s;
 }
-
+//最终返回的是一个table的iterator
 Iterator* TableCache::NewIterator(const ReadOptions& options,
                                   uint64_t file_number, uint64_t file_size,
                                   Table** tableptr) {
