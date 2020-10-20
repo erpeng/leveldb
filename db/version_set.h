@@ -12,6 +12,12 @@
 // Version,VersionSet are thread-compatible, but require external
 // synchronization on all accesses.
 
+/* 
+** 一系列Versions组成一个VersionSet
+** 当前的Version叫做current
+** 其他版本的Version是为了给存活的迭代器提供一致性视图
+** 每一个Version都会追踪一系列、分属于不同Level的Table files
+*/
 #ifndef STORAGE_LEVELDB_DB_VERSION_SET_H_
 #define STORAGE_LEVELDB_DB_VERSION_SET_H_
 
@@ -78,6 +84,7 @@ class Version {
   // Adds "stats" into the current state.  Returns true if a new
   // compaction may need to be triggered, false otherwise.
   // REQUIRES: lock is held
+  // 如果返回true,说明有了一个可以触发compaction的时机
   bool UpdateStats(const GetStats& stats);
 
   // Record a sample of bytes read at the specified internal key.

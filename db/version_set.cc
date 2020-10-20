@@ -218,6 +218,7 @@ class Version::LevelFileNumIterator : public Iterator {
   mutable char value_buf_[16];
 };
 
+// 返回一个TableCache的迭代器
 static Iterator* GetFileIterator(void* arg, const ReadOptions& options,
                                  const Slice& file_value) {
   TableCache* cache = reinterpret_cast<TableCache*>(arg);
@@ -230,6 +231,8 @@ static Iterator* GetFileIterator(void* arg, const ReadOptions& options,
   }
 }
 
+//返回一个二级的迭代器,第一级的value会返回一个file_number(8)|file_size(8)的值
+//第二级以第一级的value返回一个TableCache的迭代器
 Iterator* Version::NewConcatenatingIterator(const ReadOptions& options,
                                             int level) const {
   return NewTwoLevelIterator(
@@ -237,6 +240,7 @@ Iterator* Version::NewConcatenatingIterator(const ReadOptions& options,
       vset_->table_cache_, options);
 }
 
+// level0将所有文件的TableCache的迭代器压入,level>0时也是压入TableCache迭代器
 void Version::AddIterators(const ReadOptions& options,
                            std::vector<Iterator*>* iters) {
   // Merge all level zero files together since they may overlap
@@ -293,6 +297,7 @@ void Version::ForEachOverlapping(Slice user_key, Slice internal_key, void* arg,
                                  bool (*func)(void*, int, FileMetaData*)) {
   const Comparator* ucmp = vset_->icmp_.user_comparator();
 
+  //从level0开始查找,从新往旧依次查找
   // Search level-0 in order from newest to oldest.
   std::vector<FileMetaData*> tmp;
   tmp.reserve(files_[0].size());
@@ -312,6 +317,7 @@ void Version::ForEachOverlapping(Slice user_key, Slice internal_key, void* arg,
     }
   }
 
+  // 查找其他level.当查找到时,func返回false
   // Search other levels.
   for (int level = 1; level < config::kNumLevels; level++) {
     size_t num_files = files_[level].size();
@@ -332,6 +338,7 @@ void Version::ForEachOverlapping(Slice user_key, Slice internal_key, void* arg,
   }
 }
 
+// 查找一个k,找到后放置到value中
 Status Version::Get(const ReadOptions& options, const LookupKey& k,
                     std::string* value, GetStats* stats) {
   stats->seek_file = nullptr;
@@ -410,6 +417,8 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
   return state.found ? state.s : Status::NotFound(Slice());
 }
 
+//更新GetStats,stats不为空,则减少一个查找(说明有了一次无效查找).
+//如果一个文件的allowed_seedks小于等于0,并且此时file_to_compact_为空,则设置file_to_compact_和file_to_compact_level_
 bool Version::UpdateStats(const GetStats& stats) {
   FileMetaData* f = stats.seek_file;
   if (f != nullptr) {
@@ -423,9 +432,9 @@ bool Version::UpdateStats(const GetStats& stats) {
   return false;
 }
 
-// 更新一个文件的allow_seeks
 /* 
-** 即一个key在该文件范围之内,并且在一个level+1的文件范围之内,则level层的文件允许的allow_seeks - 1 
+** 如果调用Match超过两次,则需要触发compact.因为在level0的两个文件范围之内都可能存在该key,或者level0和更高层级的level都可能存在该key
+** 即存在无效查找.此时compact第一个查找的文件
 */
 bool Version::RecordReadSample(Slice internal_key) {
   ParsedInternalKey ikey;
