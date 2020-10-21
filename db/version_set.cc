@@ -898,7 +898,7 @@ Status VersionSet::Recover(bool* save_manifest) {
       if (this->status->ok()) *this->status = s;
     }
   };
-
+  // 1.读取current文件,获取到description file的文件名称
   // Read "CURRENT" file, which contains a pointer to the current manifest file
   std::string current;
   Status s = ReadFileToString(env_, CurrentFileName(dbname_), &current);
@@ -911,6 +911,7 @@ Status VersionSet::Recover(bool* save_manifest) {
   current.resize(current.size() - 1);
 
   std::string dscname = dbname_ + "/" + current;
+  //2.读取desciption file的文件内容到file中
   SequentialFile* file;
   s = env_->NewSequentialFile(dscname, &file);
   if (!s.ok()) {
@@ -938,6 +939,7 @@ Status VersionSet::Recover(bool* save_manifest) {
                        0 /*initial_offset*/);
     Slice record;
     std::string scratch;
+    // 3.从dscription file中读取数据,依次解析为一个个VersionEdit
     while (reader.ReadRecord(&record, &scratch) && s.ok()) {
       VersionEdit edit;
       s = edit.DecodeFrom(record);
