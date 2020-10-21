@@ -651,6 +651,11 @@ class VersionSet::Builder {
     base_->Unref();
   }
 
+  /* 
+  ** compact_pointer_放到了VersionSet的compact_pointer_中
+  ** deleted_files_放到了Builder的levels_中的deleted_files
+  ** new_files_放到了Builder的levels_中的added_files
+  */
   // Apply all of the edits in *edit to the current state.
   void Apply(VersionEdit* edit) {
     // Update compaction pointers
@@ -695,6 +700,7 @@ class VersionSet::Builder {
   }
 
   // Save the current state in *v.
+  // 主要操作的是added_files
   void SaveTo(Version* v) {
     BySmallestKey cmp;
     cmp.internal_comparator = &vset_->icmp_;

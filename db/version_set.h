@@ -161,12 +161,15 @@ class Version {
   std::vector<FileMetaData*> files_[config::kNumLevels];
 
   // Next file to compact based on seek stats.
+  // Version::UpdateStats()中赋值,根据无效seek的次数决定.
+  // seek次数在Builder.Save()函数中赋值
   FileMetaData* file_to_compact_;
   int file_to_compact_level_;
 
   // Level that should be compacted next and its compaction score.
   // Score < 1 means compaction is not strictly needed.  These fields
   // are initialized by Finalize().
+  // VersionSet::Finalize()中赋值.level0根据文件个数,其他level根据文件大小决定
   double compaction_score_;
   int compaction_level_;
 };
@@ -337,8 +340,9 @@ class Compaction {
   VersionEdit* edit() { return &edit_; }
 
   // "which" must be either 0 or 1
+  // 要合并的level和level+1的文件个数
   int num_input_files(int which) const { return inputs_[which].size(); }
-
+  // 返回level或者level+1的指定index的文件
   // Return the ith input file at "level()+which" ("which" must be 0 or 1).
   FileMetaData* input(int which, int i) const { return inputs_[which][i]; }
 
@@ -354,6 +358,7 @@ class Compaction {
   // Add all inputs to this compaction as delete operations to *edit.
   void AddInputDeletions(VersionEdit* edit);
 
+  // 判断一个user_key是否在大于level+1层不存在
   // Returns true if the information we have available guarantees that
   // the compaction is producing data in "level+1" for which no data exists
   // in levels greater than "level+1".
