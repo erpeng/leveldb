@@ -141,6 +141,7 @@ void WriteBatchInternal::SetContents(WriteBatch* b, const Slice& contents) {
   b->rep_.assign(contents.data(), contents.size());
 }
 
+// sequence不变,count增加 sequence(8)|count(4)|content1|content2
 void WriteBatchInternal::Append(WriteBatch* dst, const WriteBatch* src) {
   SetCount(dst, Count(dst) + Count(src));
   assert(src->rep_.size() >= kHeader);

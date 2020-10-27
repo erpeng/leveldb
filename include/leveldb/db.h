@@ -125,7 +125,8 @@ class LEVELDB_EXPORT DB {
 
   // For each i in [0,n-1], store in "sizes[i]", the approximate
   // file system space used by keys in "[range[i].start .. range[i].limit)".
-  //
+  // 在范围[range[i].start,range[i].limit]之间的键空间使用,保存到sizes数组中,索引范围
+  // 由n决定
   // Note that the returned sizes measure file system space usage, so
   // if the user data compresses by a factor of ten, the returned
   // sizes will be one-tenth the size of the corresponding user data size.
@@ -135,6 +136,8 @@ class LEVELDB_EXPORT DB {
                                    uint64_t* sizes) = 0;
 
   // Compact the underlying storage for the key range [*begin,*end].
+  // compact 键范围 [*begin,*end]之间的存储
+
   // In particular, deleted and overwritten versions are discarded,
   // and the data is rearranged to reduce the cost of operations
   // needed to access the data.  This operation should typically only

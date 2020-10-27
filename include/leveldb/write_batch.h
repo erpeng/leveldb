@@ -69,6 +69,7 @@ class LEVELDB_EXPORT WriteBatch {
   // the operations into this batch.
   void Append(const WriteBatch& source);
 
+  // 实际调用handler的Put和Delete来进行memtable的插入和删除操作
   // Support for iterating over the contents of a batch.
   Status Iterate(Handler* handler) const;
 

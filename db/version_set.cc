@@ -1061,7 +1061,7 @@ bool VersionSet::ReuseManifest(const std::string& dscname,
   FileType manifest_type;
   uint64_t manifest_number;
   uint64_t manifest_size;
-  // manifest的文件大小不能大于2M
+  // manifest的文件名称符合规范并且大小不能大于2M
   if (!ParseFileName(dscbase, &manifest_number, &manifest_type) ||
       manifest_type != kDescriptorFile ||
       !env_->GetFileSize(dscname, &manifest_size).ok() ||

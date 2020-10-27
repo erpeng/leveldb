@@ -178,6 +178,7 @@ DBImpl::~DBImpl() {
   }
 }
 
+// 新建一个DB,将VersionEdit信息写入manifest,并且设置current文件
 Status DBImpl::NewDB() {
   VersionEdit new_db;
   new_db.SetComparatorName(user_comparator()->Name());
@@ -323,6 +324,7 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
     }
   }
 
+  // 通过manifest构建current_这个version,构建versionset的相关变量
   s = versions_->Recover(save_manifest);
   if (!s.ok()) {
     return s;
@@ -343,6 +345,8 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
   if (!s.ok()) {
     return s;
   }
+  // 将所有version中的活跃文件放入expected,然后和当前检索到的文件比较
+  // 如果缺少文件则报错
   std::set<uint64_t> expected;
   versions_->AddLiveFiles(&expected);
   uint64_t number;
@@ -363,6 +367,7 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
   }
 
   // Recover in the order in which the logs were generated
+  // 所有在manifest中未记录的日志文件(即大于等于之前通过读取manifest读到的最后的log_number_)需要进行恢复
   std::sort(logs.begin(), logs.end());
   for (size_t i = 0; i < logs.size(); i++) {
     s = RecoverLogFile(logs[i], (i == logs.size() - 1), save_manifest, edit,
@@ -431,6 +436,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
   WriteBatch batch;
   int compactions = 0;
   MemTable* mem = nullptr;
+  // 逐条读取记录,并且插入到一个memtable中
   while (reader.ReadRecord(&record, &scratch) && status.ok()) {
     if (record.size() < 12) {
       reporter.Corruption(record.size(),
@@ -453,7 +459,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
     if (last_seq > *max_sequence) {
       *max_sequence = last_seq;
     }
-
+    // 如果需要compaction,则将memtable写成sstable
     if (mem->ApproximateMemoryUsage() > options_.write_buffer_size) {
       compactions++;
       *save_manifest = true;
@@ -503,7 +509,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
 
   return status;
 }
-
+// 将一个memtable写成一个sstable
 Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
                                 Version* base) {
   mutex_.AssertHeld();

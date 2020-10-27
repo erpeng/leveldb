@@ -12,6 +12,7 @@ namespace leveldb {
 
 class MemTable;
 
+// sequence(8)|count(4)|
 // WriteBatchInternal provides static methods for manipulating a
 // WriteBatch that we don't want in the public WriteBatch interface.
 class WriteBatchInternal {
