@@ -553,7 +553,9 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   stats_[level].Add(stats);
   return s;
 }
-
+// 将一个imm_生成为一个SSTABLE
+// 生成之后需要LogAndApply生成一个新的version
+// 并且可以删除掉旧的日志文件
 void DBImpl::CompactMemTable() {
   mutex_.AssertHeld();
   assert(imm_ != nullptr);
@@ -684,6 +686,7 @@ void DBImpl::MaybeScheduleCompaction() {
   }
 }
 
+// 后台compaction线程,由MaybeScheduleCompaction调用
 void DBImpl::BGWork(void* db) {
   reinterpret_cast<DBImpl*>(db)->BackgroundCall();
 }
@@ -710,6 +713,7 @@ void DBImpl::BackgroundCall() {
 void DBImpl::BackgroundCompaction() {
   mutex_.AssertHeld();
 
+  // 是否可以compact memtable
   if (imm_ != nullptr) {
     CompactMemTable();
     return;
@@ -718,6 +722,7 @@ void DBImpl::BackgroundCompaction() {
   Compaction* c;
   bool is_manual = (manual_compaction_ != nullptr);
   InternalKey manual_end;
+  // 两种参战文件选择方式,manual_compaction或者调用PickCompaction选择
   if (is_manual) {
     ManualCompaction* m = manual_compaction_;
     c = versions_->CompactRange(m->level, m->begin, m->end);
@@ -738,6 +743,8 @@ void DBImpl::BackgroundCompaction() {
   if (c == nullptr) {
     // Nothing to do
   } else if (!is_manual && c->IsTrivialMove()) {
+    // 不是manual并且是TrivialMove,则只需要调整level层的一个文件
+    // 然后调用LogAndApply
     // Move file to next level
     assert(c->num_input_files(0) == 1);
     FileMetaData* f = c->input(0, 0);
@@ -805,6 +812,7 @@ void DBImpl::CleanupCompaction(CompactionState* compact) {
   delete compact;
 }
 
+// 打开一个新的sstable,并且建立compact->builder(TableBuilder）
 Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
   assert(compact != nullptr);
   assert(compact->builder == nullptr);
@@ -830,6 +838,7 @@ Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
   return s;
 }
 
+// 释放资源并且将新生成的文件刷新到磁盘
 Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
                                           Iterator* input) {
   assert(compact != nullptr);
@@ -909,12 +918,14 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   assert(versions_->NumLevelFiles(compact->compaction->level()) > 0);
   assert(compact->builder == nullptr);
   assert(compact->outfile == nullptr);
+  // 如果存在snapshotlist,则最小值为list中最小的seq;
+  // 否则为version中的seq
   if (snapshots_.empty()) {
     compact->smallest_snapshot = versions_->LastSequence();
   } else {
     compact->smallest_snapshot = snapshots_.oldest()->sequence_number();
   }
-
+  // 返回一个归并排序迭代器,每次选取最小的值写入文件
   Iterator* input = versions_->MakeInputIterator(compact->compaction);
 
   // Release mutex while we're actually doing the compaction work
@@ -941,6 +952,8 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     }
 
     Slice key = input->key();
+    // ShouldStopBefore第一次调用不计数,即必须compact至少一次key
+    // 之后才会开始计算大小;此处的判断是防止单个文件过大,仍会继续执行compact
     if (compact->compaction->ShouldStopBefore(key) &&
         compact->builder != nullptr) {
       status = FinishCompactionOutputFile(compact, input);
@@ -972,6 +985,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       } else if (ikey.type == kTypeDeletion &&
                  ikey.sequence <= compact->smallest_snapshot &&
                  compact->compaction->IsBaseLevelForKey(ikey.user_key)) {
+        // 更高层没有了该key;低层的seq比这个大;因此这个key不需要进行写入了,相当于正式删除
         // For this user key:
         // (1) there is no data in higher levels
         // (2) data in lower levels will have larger sequence numbers
@@ -1009,6 +1023,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       compact->builder->Add(key, input->value());
 
       // Close output file if it is big enough
+      // 如果一个compact 的table文件过大,则finish
       if (compact->builder->FileSize() >=
           compact->compaction->MaxOutputFileSize()) {
         status = FinishCompactionOutputFile(compact, input);
@@ -1048,6 +1063,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   stats_[compact->compaction->level() + 1].Add(stats);
 
   if (status.ok()) {
+    // 生成edit(包括需要删除的文件以及新生成的文件),并且调用LogAndApply
     status = InstallCompactionResults(compact);
   }
   if (!status.ok()) {
@@ -1364,6 +1380,8 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       break;
     } else if (allow_delay && versions_->NumLevelFiles(0) >=
                                   config::kL0_SlowdownWritesTrigger) {
+      // 如果level0的文件个数超过软性限制8个,则sleep 1000 microseconds
+
       // We are getting close to hitting a hard limit on the number of
       // L0 files.  Rather than delaying a single write by several
       // seconds when we hit the hard limit, start delaying each
@@ -1376,18 +1394,25 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       mutex_.Lock();
     } else if (!force &&
                (mem_->ApproximateMemoryUsage() <= options_.write_buffer_size)) {
+      // memtable有足够空间,并且不强制delay,则直接返回
+
       // There is room in current memtable
       break;
     } else if (imm_ != nullptr) {
+      // 如果有imm,则等待后台compaction完成
+
       // We have filled up the current memtable, but the previous
       // one is still being compacted, so we wait.
       Log(options_.info_log, "Current memtable full; waiting...\n");
       background_work_finished_signal_.Wait();
+      // 如果level0文件大于等于12个,也等待后台compaction完成
     } else if (versions_->NumLevelFiles(0) >= config::kL0_StopWritesTrigger) {
       // There are too many level-0 files.
       Log(options_.info_log, "Too many L0 files; waiting...\n");
       background_work_finished_signal_.Wait();
     } else {
+      // 新创建memtable,将imm_赋值为原始的mem_,并且新建log文件.开启compaction
+      // 一个日志对应一个memtable,当imm_ compaction之后,可以删除旧的日志文件
       // Attempt to switch to a new memtable and trigger compaction of old
       assert(versions_->PrevLogNumber() == 0);
       uint64_t new_log_number = versions_->NewFileNumber();
