@@ -254,6 +254,7 @@ void DBImpl::RemoveObsoleteFiles() {
                   (number == versions_->PrevLogNumber()));
           break;
         case kDescriptorFile:
+          // 旧的manifest文件可以删除
           // Keep my manifest file, and any newer incarnations'
           // (in case there is a race that allows other incarnations)
           keep = (number >= versions_->ManifestFileNumber());
