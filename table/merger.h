@@ -18,6 +18,8 @@ class Iterator;
 // key is present in K child iterators, it will be yielded K times.
 //
 // REQUIRES: n >= 0
+// 从前往后查找最小的一个,即sequence最大的一个
+// 从后往前查找最大的一个,即sequence最小的一个
 Iterator* NewMergingIterator(const Comparator* comparator, Iterator** children,
                              int n);
 

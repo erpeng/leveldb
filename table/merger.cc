@@ -44,6 +44,7 @@ class MergingIterator : public Iterator {
     direction_ = kReverse;
   }
 
+  // 所有的iterator都seek一次,然后将current_赋值为有最小key的那个
   void Seek(const Slice& target) override {
     for (int i = 0; i < n_; i++) {
       children_[i].Seek(target);

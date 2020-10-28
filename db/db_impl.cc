@@ -1082,6 +1082,11 @@ static void CleanupIteratorState(void* arg1, void* arg2) {
 
 }  // anonymous namespace
 
+/* 
+** 将所有的iterator(包括memtalbe,immutablememtable,sstable)合并之后返回
+** latest_sequence:versionset中的sequence
+** seed: ++seed_ 
+*/
 Iterator* DBImpl::NewInternalIterator(const ReadOptions& options,
                                       SequenceNumber* latest_snapshot,
                                       uint32_t* seed) {
@@ -1125,6 +1130,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
   Status s;
   MutexLock l(&mutex_);
   SequenceNumber snapshot;
+  // 根据是否配置snapshot,决定sequence number
   if (options.snapshot != nullptr) {
     snapshot =
         static_cast<const SnapshotImpl*>(options.snapshot)->sequence_number();
@@ -1147,6 +1153,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     mutex_.Unlock();
     // First look in the memtable, then in the immutable memtable (if any).
     LookupKey lkey(key, snapshot);
+    // 依次从memtable,immutablememtable,sstable读取
     if (mem->Get(lkey, value, &s)) {
       // Done
     } else if (imm != nullptr && imm->Get(lkey, value, &s)) {
@@ -1157,7 +1164,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     }
     mutex_.Lock();
   }
-
+  // 如果是从sstable中读取的,则需要更新状态(allowed_seeks)并且判断是否需要compaction
   if (have_stat_update && current->UpdateStats(stats)) {
     MaybeScheduleCompaction();
   }
@@ -1167,6 +1174,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
   return s;
 }
 
+// 返回一个DB的iterator,会遍历memtable和所有的sstable
 Iterator* DBImpl::NewIterator(const ReadOptions& options) {
   SequenceNumber latest_snapshot;
   uint32_t seed;
@@ -1213,6 +1221,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
 
   MutexLock l(&mutex_);
   writers_.push_back(&w);
+  // write时需要首先放到一个deque中然后等待执行
   while (!w.done && &w != writers_.front()) {
     w.cv.Wait();
   }
@@ -1233,6 +1242,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
     // during this phase since &w is currently responsible for logging
     // and protects against concurrent loggers and concurrent writes
     // into mem_.
+    // 写入日志,然后插入memtable.
     {
       mutex_.Unlock();
       status = log_->AddRecord(WriteBatchInternal::Contents(write_batch));
@@ -1255,7 +1265,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
       }
     }
     if (write_batch == tmp_batch_) tmp_batch_->Clear();
-
+    // 更新versionset中的last_sequence
     versions_->SetLastSequence(last_sequence);
   }
 
@@ -1286,6 +1296,12 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
 
 // REQUIRES: Writer list must be non-empty
 // REQUIRES: First writer must have a non-null batch
+/* 
+** 将writers_中的所有的batch进行合并,终止条件为max_size
+** 如果第一条的写入大小<=128k,则max_size = size + 128k
+** 如果第一条的写入大小>128,则max_size = 1M
+** 返回值为一个合并好的WriteBatch,last_writer会赋值为最后一条写入的Writer
+*/
 WriteBatch* DBImpl::BuildBatchGroup(Writer** last_writer) {
   mutex_.AssertHeld();
   assert(!writers_.empty());
