@@ -303,11 +303,13 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
   // may already exist from a previous failed creation attempt.
   env_->CreateDir(dbname_);
   assert(db_lock_ == nullptr);
+  // 加文件锁
   Status s = env_->LockFile(LockFileName(dbname_), &db_lock_);
   if (!s.ok()) {
     return s;
   }
 
+  // 如果不存在current文件,则新建一个DB.
   if (!env_->FileExists(CurrentFileName(dbname_))) {
     if (options_.create_if_missing) {
       s = NewDB();
@@ -353,6 +355,7 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
   uint64_t number;
   FileType type;
   std::vector<uint64_t> logs;
+  // 将所有大于等于manifest中的log_number的日志文件压入logs
   for (size_t i = 0; i < filenames.size(); i++) {
     if (ParseFileName(filenames[i], &number, &type)) {
       expected.erase(number);
@@ -460,7 +463,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
     if (last_seq > *max_sequence) {
       *max_sequence = last_seq;
     }
-    // 如果需要compaction,则将memtable写成sstable
+    // 如果需要compaction,则将memtable写成sstable.此时需要在edit中新增文件
     if (mem->ApproximateMemoryUsage() > options_.write_buffer_size) {
       compactions++;
       *save_manifest = true;
@@ -557,6 +560,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
 // 将一个imm_生成为一个SSTABLE
 // 生成之后需要LogAndApply生成一个新的version
 // 并且可以删除掉旧的日志文件
+// 当有imm_需要调用这个函数,在调用之前,会将log_number_设置为原来的的log_number_+1
 void DBImpl::CompactMemTable() {
   mutex_.AssertHeld();
   assert(imm_ != nullptr);

@@ -494,6 +494,8 @@ bool Version::RecordReadSample(Slice internal_key) {
 
 void Version::Ref() { ++refs_; }
 
+// delete 一个version时会调用version的析构函数
+// 其中会遍历version中的files,files ref小于等于0的会delete掉
 void Version::Unref() {
   assert(this != &vset_->dummy_versions_);
   assert(refs_ >= 1);
@@ -820,6 +822,7 @@ void VersionSet::AppendVersion(Version* v) {
   // Make "v" current
   assert(v->refs_ == 0);
   assert(v != current_);
+  // 首先将当前的version Unref掉.然后将v设置为当前version
   if (current_ != nullptr) {
     current_->Unref();
   }
@@ -1045,6 +1048,7 @@ Status VersionSet::Recover(bool* save_manifest) {
     if (ReuseManifest(dscname, current)) {
       // No need to save new manifest
     } else {
+      // save_manifest决定是否需要新建一个manifest,如果是true,则新建,否则为false
       *save_manifest = true;
     }
   }
@@ -1135,6 +1139,7 @@ void VersionSet::Finalize(Version* v) {
 }
 // 将versionset中的compacat_pointer_信息和version中的files信息放到一个新的edit中
 // 并且将该edit encode之后写入日志
+// 为何不写log_number_,last_sequence_等数据,或许是因为之后肯定会写一遍,所以此处不用再写
 Status VersionSet::WriteSnapshot(log::Writer* log) {
   // TODO: Break up into multiple records to reduce memory usage on recovery?
 
@@ -1220,7 +1225,7 @@ uint64_t VersionSet::ApproximateOffsetOf(Version* v, const InternalKey& ikey) {
   return result;
 }
 
-// 所有version的所有层级的所有文件序号都放入live中
+// 所有versionset中的所有层级的所有文件序号都放入live中
 void VersionSet::AddLiveFiles(std::set<uint64_t>* live) {
   for (Version* v = dummy_versions_.next_; v != &dummy_versions_;
        v = v->next_) {
