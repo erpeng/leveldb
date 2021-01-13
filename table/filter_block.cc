@@ -32,6 +32,7 @@ void FilterBlockBuilder::AddKey(const Slice& key) {
   keys_.append(k.data(), k.size());
 }
 
+//生成一个布隆过滤器的块
 Slice FilterBlockBuilder::Finish() {
   if (!start_.empty()) {
     GenerateFilter();
@@ -88,12 +89,16 @@ FilterBlockReader::FilterBlockReader(const FilterPolicy* policy,
 }
 
 bool FilterBlockReader::KeyMayMatch(uint64_t block_offset, const Slice& key) {
+  //根据块偏移计算布隆过滤器在块中的索引
   uint64_t index = block_offset >> base_lg_;
+  //索引必须小于布隆过滤器的个数
   if (index < num_) {
     uint32_t start = DecodeFixed32(offset_ + index * 4);
     uint32_t limit = DecodeFixed32(offset_ + index * 4 + 4);
     if (start <= limit && limit <= static_cast<size_t>(offset_ - data_)) {
+      //获取布隆过滤器的内容
       Slice filter = Slice(data_ + start, limit - start);
+      //查看一个key是否匹配该布隆过滤器
       return policy_->KeyMayMatch(key, filter);
     } else if (start == limit) {
       // Empty filters do not match any keys

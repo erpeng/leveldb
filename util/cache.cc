@@ -258,6 +258,7 @@ void LRUCache::LRU_Append(LRUHandle* list, LRUHandle* e) {
   e->next->prev = e;
 }
 
+//如果查找到一个key,则将其refs加1
 Cache::Handle* LRUCache::Lookup(const Slice& key, uint32_t hash) {
   MutexLock l(&mutex_);
   LRUHandle* e = table_.Lookup(key, hash);
@@ -267,6 +268,7 @@ Cache::Handle* LRUCache::Lookup(const Slice& key, uint32_t hash) {
   return reinterpret_cast<Cache::Handle*>(e);
 }
 
+//调用Release后会将refs减1
 void LRUCache::Release(Cache::Handle* handle) {
   MutexLock l(&mutex_);
   Unref(reinterpret_cast<LRUHandle*>(handle));
@@ -289,6 +291,7 @@ Cache::Handle* LRUCache::Insert(const Slice& key, uint32_t hash, void* value,
   e->refs = 1;  // for the returned handle.
   std::memcpy(e->key_data, key.data(), key.size());
 
+//如果设置了容量大小,则刚开始插入时需要将ref置为2,in_cache置为true
   if (capacity_ > 0) {
     e->refs++;  // for the cache's reference.
     e->in_cache = true;
@@ -326,6 +329,7 @@ bool LRUCache::FinishErase(LRUHandle* e) {
   return e != nullptr;
 }
 
+//Erase会将in_cache置为false,并且将refs减1
 void LRUCache::Erase(const Slice& key, uint32_t hash) {
   MutexLock l(&mutex_);
   FinishErase(table_.Remove(key, hash));

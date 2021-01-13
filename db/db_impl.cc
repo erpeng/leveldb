@@ -225,6 +225,8 @@ void DBImpl::MaybeIgnoreError(Status* s) const {
 ** 2.取出所有目录中的文件
 ** 3.判断是否可以删除
 */
+// VersionSet是全部的版本,包括当前正在进行compaction的文件以及即将生成的文件
+// 包括Immutable MemTable需要生成的SSTable文件,因此会有当前的日志文件以及即将需要删除的日志文件即prevlog。
 void DBImpl::RemoveObsoleteFiles() {
   mutex_.AssertHeld();
 
@@ -341,6 +343,7 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
   // Note that PrevLogNumber() is no longer used, but we pay
   // attention to it in case we are recovering a database
   // produced by an older version of leveldb.
+  // 旧版本的leveldb在使用PrevLogNumber
   const uint64_t min_log = versions_->LogNumber();
   const uint64_t prev_log = versions_->PrevLogNumber();
   std::vector<std::string> filenames;
